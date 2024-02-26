@@ -1,0 +1,114 @@
+---
+title: "DSCI5340_HW1_Group1"
+output: html_document
+date: "2023-09-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r loadpackages, message=FALSE, warning=FALSE}
+pacman::p_load(dplyr, fpp3, ggplot2, lubridate, tidyverse, GGally, gridExtra,seasonal,  fable)
+theme_set(theme_classic())
+```
+
+
+1. What type of Box-Cox transformation would be helpful for the data? Explain your
+answer.
+
+```{r importing, message=FALSE, warning=FALSE}
+canada <- canadian_gas
+head(canada)
+tail(canada)
+```
+```{r time series, message=FALSE, warning=FALSE}
+canada %>% autoplot(Volume)+
+ggtitle("Canadian Gas Production")
+```
+```{r box cox, message=FALSE, warning=FALSE}
+canada %>%
+  features(Volume, features = guerrero)
+bc <- canada %>% autoplot(box_cox(Volume, 0.5767648	)) +
+  labs(y = "Box-Cox transformed Volume")
+bc
+```
+From the above graph, the optimal lamda found uing guerreo feature did not normalize the variance accross the data. Since the optimal lambda value is 0.5767648 which is near 0.5, we could use square root plus linear transformation.
+
+
+2. Subset the canadian_gas data and keep observations from March 1990 to February
+2005. Plot the data using autoplot(), gg_subseries(), and gg_season(). Describe the
+presence (or absence) of seasonality in the data.
+
+```{r split, message=FALSE, warning=FALSE}
+canada_split <- canada %>%
+filter_index("1990 Mar" ~ "2005 Feb") %>%
+select(c(Month, Volume))
+head(canada_split)
+tail(canada_split)
+```
+
+```{r plots, message=FALSE, warning=FALSE}
+# Autoplot 
+canada_split %>%
+  autoplot(Volume) +
+  xlab("Year Month") + ylab("gas production volume in billions of cubic metres") +
+  ggtitle("canadian gas production from March 1990 to Feb 2005")
+# Subseries plot
+gg_subseries(canada_split) +
+  xlab("Year Month") + ylab("gas production volume in billions of cubic metres") +
+  ggtitle("canadian gas production from March 1990 to Feb 2005")
+#seasonality plot
+gg_season(canada_split) +
+  xlab("Year Month") + ylab("gas production volume in billions of cubic metres") +
+  ggtitle("canadian gas production from March 1990 to Feb 2005")
+```
+
+From the 3 plots above(especially from the seasonality plot) we can tell that there is a seasonality in the data as the pattern is following almost the same pattern over the years wirh the volume being the highest in january, march, december and lowest between june and september.The production is high at the beggining and ending of the year and relatively low during the middle.
+
+3. Perform an STL decomposition of the data. Plot the seasonal component from STL
+decomposition using gg_season(). Does the seasonal shape change over time? Explain.
+
+```{r stl, message=FALSE, warning=FALSE}
+library(tsibble)
+#Perform STL decomposition of the data
+dcmp <- canada_split %>%
+model(stl = STL(Volume))
+components(dcmp)
+# STL Decomposition
+components(dcmp) %>%
+  autoplot() + xlab("Year Month")
+#seasonality plot
+components(dcmp) %>% 
+  gg_season(season_year) +ggtitle("Seasonal component from STL decomposition")
+```
+
+No, the seasonality does not change a lot over time as the production is hitting similar ups and downs except in may, July and august where it increased over time and November where it decreased over time.
+
+4. Plot a seasonally-adjusted series using the results from the model above. Using this plot, explain why the seasonally-adjusted series is different from the original series.
+
+```{r seasonal_adjustment, message=FALSE, warning=FALSE}
+# Seasonally-Adjusted component
+canada_split %>%
+  autoplot(Volume, color='gray') +
+  autolayer(components(dcmp), season_adjust, color='blue') +
+  xlab("Year Month") + ylab("Volume") +
+  ggtitle("Canadian gas production seasonally adjusted")
+```
+
+The seasonally adjusted graph is different from the graph above because, while the seasonally adjusted graph is a graph in which seasonality is removed, the previous graph shows the pattern with seasonality.
+
+5. Next, perform decomposition using SEATS and X-11 decomposition methods. How are
+they different from the results obtained using the STL decomposition?
+
+```{r seats, x11, message=FALSE, warning=FALSE}
+seats_decomp <- canada_split %>%
+model(seats = X_13ARIMA_SEATS(Volume ~ seats())) %>%
+components()
+autoplot(seats_decomp)
+x11_decomp <- canada_split %>%
+model( x11 = X_13ARIMA_SEATS(Volume ~ x11())) %>%
+components()
+x11_decomp %>% autoplot()
+```
+The variance in the seasonal chart of STL > X-11 > Seats.

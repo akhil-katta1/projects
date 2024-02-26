@@ -1,0 +1,173 @@
+---
+title: "DSCI5340_HW2_F23_group1"
+author: 'null'
+date: "10/4/2023"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+
+
+
+## Team Members
+- Jai Sai Akhil Katta
+- Sai Sathwik Reddy Kunnuru
+- Thakur Neetu Singh
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r load packages}
+pacman::p_load(fpp3, lubridate, tidyverse)
+```
+1. Produce a time plot of the data and describe the patterns. Identify any unusual or
+unexpected fluctuations in the time series.
+
+```{r import data}
+# Load the data set insurance.
+ins <- insurance 
+head(ins)
+tail(ins)
+```
+
+
+```{r time plot}
+ins %>% 
+  autoplot(TVadverts) +
+  labs(title = 'TV advertising expenditure plotted against time')
+ins %>% 
+  autoplot(Quotes) +
+  labs(title = 'Displaying monthly quotations over time')
+```
+
+From the time plots of Quotes and TVadvts that has been plotted above, we can observe that the overall pattern of both the graphs are almost the same but on a different scale.
+
+After both quotes and TVadverts peaked and fell moderately before mid 2002, at around june and july TVadverts plummeted to their second lowest causing quotes to fall down to their third lowest.
+
+Once the insurance company realized that the decrease in TVadverts is the reason for their declined quotes, they increased the no. of TVadverts which went to almost the same level as it is in jan 2002, which in turn caused the increase in the quotes.  
+
+both the graphs declined continuously until October 2003 before peaking in the next couple of months.
+
+in mid 2004 both the graphs dipped to their all time low and peaked again immediately to jan 2002 levels
+
+there was a small dip in dec 2004 which was followed by an all time peak in both the graphs
+
+
+
+
+2. Fit a regression model with Quotes as the dependent variable and a linear trend and
+seasonal dummies as explanatory variables. 
+```{r regression}
+#regression model
+lm_fit <- ins %>%
+  model(lm=TSLM(Quotes~trend()+season()))
+report(lm_fit)
+```
+3. Create a plot showing two lines – a fitted line from the above regression and a line
+with actual quotes. What do you observe in this plot? 
+
+```{r line graph}
+# comparing Quotes and Fitted line
+augment(lm_fit) %>%
+  ggplot(aes(x=Month))+
+  geom_line(aes(y=Quotes,color='Quotes'))+
+    geom_line(aes(y=.fitted,color='Fitted line'))+
+    ylab(NULL)+
+    labs(title="A comparison of Quotes and Fitted line")
+```
+There is a cyclic trend in the fitted line and model does not capture the complete picture
+
+4. Create a scatter plot showing fitted v actual. Do you observe any patterns? 
+```{r scatter plot}
+#scatter plot Quotes vs Fitted line
+ggplot(augment(lm_fit),aes(x=Quotes,y=.fitted))+
+  geom_point()+
+  geom_smooth(method='lm',formula=y~x,se=FALSE)+
+  xlab("Quotes")+ylab("Fitted line")+
+  theme(legend.position = NULL)
+```
+By looking at the positive slope, we can say that there is a positive correlation between quotes and fitted line
+
+5. Plot the residuals against time. Do these plots reveal any autocorrelation in the
+model?
+```{r}
+augment(lm_fit) %>% ACF(.resid, lag_max = 24) %>% autoplot() + labs(title = "ACF")
+augment(lm_fit) %>% autoplot(.resid) + xlab("Day") + ylab("") +
+  ggtitle("Residuals from naïve method")
+```
+
+
+```{r}
+# Plot Residuals over Time
+augment(lm_fit) %>%
+  ggplot(aes(y=.resid ,x=Month))+
+  geom_point(aes(color='red'))+
+  xlab("Month")+
+  ylab("Residual")+
+  ggtitle("Residuals over Time")
+```
+with 7 lines out of 24 total lines crossing the line, we can say there is 
+significant auto correlation which is not
+
+6. Generate box plots of the residuals for each month. Do these plots reveal any
+patterns in the above model?
+
+```{r}
+# Box Plots of Residuals by Month
+augment(lm_fit) %>%
+  ggplot(aes(x = factor(month(Month, label = TRUE)), y = .resid)) +
+  geom_boxplot() +
+  xlab("Month") +
+  ylab("Residual") +
+  labs(title = "Box Plots of Residuals by Month")
+```
+from this plot, we can say that some months like March and April have higher range of residuals compared to the rest of the months.
+
+7. Run a Ljung-Box test and interpret the results.
+```{r}
+# Run the Ljung-Box test
+augment(lm_fit) %>% features(.innov, ljung_box, lag=10, dof=0)
+```
+with a p value less than 0.05 we can reject null hypothesis and say that there is auto correlation in this model
+
+8. Interpret the coefficients – the one associated with the trend variable and at least
+one associated with a seasonal variable. 
+```{r}
+# Interpret the coefficients
+report(lm_fit)
+```
+with a p value of 0.757 which is significantly greater that 0.05, we fail to reject null hypothesis that there is trend and with a unit increase in the value of trend, the value of quotes will increase by 0.01102.
+
+the season()year4, with a p value of 0.313 which is significantly greater that 0.05, we fail to reject null hypothesis that season()year4 is not a significant variable and with a unit increase in the value of season()year4, the value of quotes will decrease by 1.84559.
+9. Use your regression model to forecast the monthly Quotes for 24 months ahead.
+Produce prediction intervals for those forecasts.
+```{r}
+# Predict the monthly Quotes for the next 2 years using the regression model.
+forcast <-lm_fit %>%
+  forecast(h=24) 
+ins %>%
+  autoplot(Quotes)+
+  autolayer(forcast,.mean)+
+  ggtitle("forecast for next 24 months")
+
+
+```
+
+ Question 10
+ 
+ Here are some suggestions for the model:
+
+- we can use some kind of transformation to reduce the difference in variability observed in the box plot of the residuals
+- 
+
+- We could use the STL decomposition to get a better idea about the trend and seasonal properties of the data 
+
