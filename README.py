@@ -1,5 +1,6 @@
-# Get unique, non-null job codes as a list
+# Get unique job codes and convert all to strings
 job_codes = dup['Job Code'].dropna().unique().tolist()
+job_codes = [str(code) for code in job_codes]
 
-# Print them as a clean, comma-separated string
+# Print as comma-separated string
 print(", ".join(job_codes))
