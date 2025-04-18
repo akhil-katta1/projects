@@ -1,12 +1,11 @@
-# Load your dataset
-michigan_ingest_df = pd.read_csv('/mnt/data/file-CXxZhv6kZWmcz4Tp8JPmTP')  # Replace with the actual file path
+# Set pandas to display all rows and columns
+pd.set_option('display.max_rows', None)  # No limit to the number of rows
+pd.set_option('display.max_columns', None)  # No limit to the number of columns
+pd.set_option('display.width', None)  # To avoid line wrapping
+pd.set_option('display.max_colwidth', None)  # Show full column content
 
-# Find duplicate rows
-michigan_dup = michigan_ingest_df[michigan_ingest_df.duplicated(keep=False)]  # This includes all duplicates
+# Find duplicate rows (including the first occurrence)
+duplicates = df[df.duplicated(keep=False)]  # This will include all duplicates
 
-# Set the index to the row with the maximum value of a specific column (e.g., the first column or based on another logic)
-max_row_index = michigan_dup.idxmax()  # Find the index of the maximum value across the DataFrame
-michigan_dup.set_index(michigan_dup.index[max_row_index[0]], inplace=True)  # Set the max value row as the index
-
-# Print the duplicate rows
-print(michigan_dup)
+# Print the entire table of duplicates
+print(duplicates)
