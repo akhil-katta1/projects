@@ -1,15 +1,12 @@
-import pandas as pd
-
 # Load your dataset
-df = pd.read_csv('your_dataset.csv')  # Replace with your dataset file
-
-# Set the index to the row with the maximum value of a specific column (for example, 'column_name')
-# If you want to use the index as the max row in general, you can use the max of the DataFrame itself.
-max_row_index = df.idxmax()  # Finds the index of the maximum value across the DataFrame
-df.set_index(df.index[max_row_index[0]], inplace=True)  # Set the max value row as the index
+michigan_ingest_df = pd.read_csv('/mnt/data/file-CXxZhv6kZWmcz4Tp8JPmTP')  # Replace with the actual file path
 
 # Find duplicate rows
-duplicates = df[df.duplicated(keep=False)]  # This will include all duplicates
+michigan_dup = michigan_ingest_df[michigan_ingest_df.duplicated(keep=False)]  # This includes all duplicates
+
+# Set the index to the row with the maximum value of a specific column (e.g., the first column or based on another logic)
+max_row_index = michigan_dup.idxmax()  # Find the index of the maximum value across the DataFrame
+michigan_dup.set_index(michigan_dup.index[max_row_index[0]], inplace=True)  # Set the max value row as the index
 
 # Print the duplicate rows
-print(duplicates)
+print(michigan_dup)
