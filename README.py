@@ -53,3 +53,18 @@ def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
 
 # Run it
 find_duplicates_by_text("/tmp/pdfs/")
+
+
+
+
+
+---------------------------------------------------------------------------
+ModuleNotFoundError                       Traceback (most recent call last)
+Cell In[41], line 42
+     40 import os
+     41 import hashlib
+---> 42 from pdfminer.high_level import extract_text
+     44 def calculate_text_hash(file_path):
+     45     """Extract text from PDF and calculate a hash."""
+
+ModuleNotFoundError: No module named 'pdfminer.high_level'
