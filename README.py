@@ -1,56 +1,88 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[4]:
+
+
 import os
-import requests
-from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor
 
-# Function to download a PDF
-def download_pdf(url, folder):
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        filename = os.path.join(folder, url.split('/')[-1])
-
-        # Save the PDF to the specified folder
-        with open(filename, 'wb') as f:
-            f.write(response.content)
-        print(f"Downloaded: {filename}")
-    except requests.exceptions.RequestException as e:
-        print(f"Error downloading {url}: {e}")
-
-# Function to scrape and find all PDF links on a webpage
-def get_pdf_links(url):
-    response = requests.get(url)
-    response.raise_for_status()  # Check for request errors
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Find all links with the 'href' attribute containing '.pdf'
-    pdf_links = []
-    for link in soup.find_all('a', href=True):
-        href = link['href']
-        if href.lower().endswith('.pdf'):
-            # Handle relative URLs by converting them to absolute URLs
-            if href.startswith('http'):
-                pdf_links.append(href)
-            else:
-                pdf_links.append(url + href)
+def extract_url_pdf(input_url,folder_path=os.getcwd()):
     
-    return pdf_links
+    import os
+    import requests
+    from urllib.parse import urljoin
+    from bs4 import BeautifulSoup
+    import pandas as pd
+    import datetime
+    
+    url = input_url
 
-# Main function to scrape and download PDFs
-def download_all_pdfs(webpage_url, folder='downloads'):
-    # Create a folder to save PDFs if it doesn't exist
-    if not os.path.exists(folder):
-        os.makedirs(folder)
+    #If there is no such folder, the script will create one automatically
+    folder_location = folder_path
+    if not os.path.exists(folder_location):os.mkdir(folder_location)
 
-    # Get all PDF links from the webpage
-    pdf_links = get_pdf_links(webpage_url)
-    print(f"Found {len(pdf_links)} PDF links.")
+    response = requests.get(url)
+    soup= BeautifulSoup(response.text, "html.parser") 
 
-    # Use ThreadPoolExecutor to download PDFs concurrently
-    with ThreadPoolExecutor() as executor:
-        for pdf_url in pdf_links:
-            executor.submit(download_pdf, pdf_url, folder)
+    link_text=list()
+    link_href=list()
+    link_file=list()
+    
+    counter=0
 
-# Example usage
-webpage_url = 'http://example.com'  # Replace with the webpage URL
-download_all_pdfs(webpage_url)
+    for link in soup.select("a[href$='.pdf']"):
+        #Name the pdf files using the last portion of each link which are unique in this case
+        
+        filename = os.path.join(folder_location,link['href'].split('/')[-1])
+        with open(filename, 'wb') as f:
+            f.write(requests.get(urljoin(url,link['href'])).content)
+            
+        link_text.append(str(link.text))
+        
+        link_href.append(link['href'])
+
+        link_file.append(link['href'].split('/')[-1])
+        
+        counter+=1
+
+        print(counter, "-Files Extracted from URL named ",link['href'].split('/')[-1])
+        
+    table_dict={"Text":link_text,"Url_Link":link_href,"File Name":link_file}
+
+    df=pd.DataFrame(table_dict)
+    
+    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
+    
+    print("Creating an Excel file with Name of FIle, Url Link and Link Text...")
+    
+
+    new_excel_file=os.path.join(folder_location,"Excel_Output_"+time_stamp+".xlsx")
+
+    writer = pd.ExcelWriter(new_excel_file, engine='openpyxl')
+
+    df.to_excel(writer,sheet_name="Output")
+
+    
+    writer.save()
+
+
+    print("All Pdf files downloaded and Excel File Created")
+
+
+# In[2]:
+
+
+
+#urls to try:
+
+# https://www.icai.org/category/bos-important-announcements
+# https://www.icai.org/post.html?post_id=17843
+#https://www.icai.org/post.html?post_id=17825
+# https://cbic-gst.gov.in/central-tax-notifications.html
+# https://trends.builtwith.com/websitelist/Responsive-Tables
+
+
+# In[5]:
+
+
+extract_url_pdf(input_url="https://www.icai.
