@@ -5,6 +5,15 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 
+
+
+
+target_url = "https://mcsc.state.mi.us/MCSCJobSpecifications/JobSpecMain.aspx"
+    
+    # Folder inside Lakehouse where PDFs will be saved
+lakehouse_target_folder = f"{secret_1}@onelake.dfs.fabric.microsoft.com/{secret_2}/Files/Market Data Files/State of Michigan/pdfs"
+
+
 # Define a browser-like header
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -54,7 +63,5 @@ def download_pdfs_to_lakehouse(url, lakehouse_folder="/lakehouse/default/Files/P
             executor.submit(download_single_pdf_to_lakehouse, pdf_url, lakehouse_folder, idx)
 
 # Main execution
-if _name_ == "_main_":
-    target_url = "https://www.icai.org/post.html?post_id=17843"
-    lakehouse_target_folder = "/lakehouse/default/Files/PDF_Downloads"
-    download_pdfs_to_lakehouse(target_url, lakehouse_target_folder)
+
+download_pdfs_to_lakehouse(target_url, lakehouse_target_folder)
