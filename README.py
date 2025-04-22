@@ -1,59 +1,35 @@
 import os
-import hashlib
-import fitz  # PyMuPDF
 
-def calculate_text_hash(file_path):
-    """Extract text from PDF and calculate a hash."""
+def compare_files(file1, file2):
+    """Compare two PDF files byte by byte."""
     try:
-        doc = fitz.open(file_path)
-        text = ""
-        for page_num in range(doc.page_count):
-            page = doc.load_page(page_num)
-            text += page.get_text()
-        text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()
-        return text_hash
+        with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
+            file1_bytes = f1.read()
+            file2_bytes = f2.read()
+            return file1_bytes == file2_bytes  # Return True if identical, False otherwise
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        return None
+        print(f"Error comparing {file1} and {file2}: {e}")
+        return False
 
-def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
-    text_hash_to_files = {}
-    name_to_text_hash = {}
+def find_duplicates_by_bytes(folder_path="/tmp/pdfs/"):
+    files = [f for f in os.listdir(folder_path) if f.endswith(".pdf")]
+    duplicates = []
 
-    # Scan through all PDFs
-    for file_name in os.listdir(folder_path):
-        if file_name.endswith(".pdf"):
-            full_path = os.path.join(folder_path, file_name)
-            text_hash = calculate_text_hash(full_path)
+    # Compare each pair of files
+    for i in range(len(files)):
+        for j in range(i + 1, len(files)):
+            file1 = os.path.join(folder_path, files[i])
+            file2 = os.path.join(folder_path, files[j])
+            if compare_files(file1, file2):
+                # If the files are identical, store them as duplicates
+                duplicates.append((files[i], files[j]))
 
-            if text_hash:
-                # Group files by extracted text hash
-                if text_hash not in text_hash_to_files:
-                    text_hash_to_files[text_hash] = []
-                text_hash_to_files[text_hash].append(file_name)
-
-                # Track if files with the same name have different text
-                if file_name not in name_to_text_hash:
-                    name_to_text_hash[file_name] = []
-                name_to_text_hash[file_name].append(text_hash)
-
-    # Find duplicates based on text
-    print("🔎 Checking for duplicate PDFs by extracted text...\n")
-    duplicates = {h: f for h, f in text_hash_to_files.items() if len(f) > 1}
     if duplicates:
-        for hash_val, files in duplicates.items():
-            print(f"✅ Duplicate text found in files: {files}")
+        print("✅ Duplicate files found:")
+        for duplicate in duplicates:
+            print(f"Duplicate pair: {duplicate[0]} and {duplicate[1]}")
     else:
-        print("❌ No text-based duplicate PDFs found.")
+        print("❌ No duplicate PDFs found.")
 
-    # Find same-name but different text
-    print("\n🔎 Checking for files with same name but different text...\n")
-    same_name_diff_text = {n: h for n, h in name_to_text_hash.items() if len(set(h)) > 1}
-    if same_name_diff_text:
-        for name, hashes in same_name_diff_text.items():
-            print(f"⚠ File name '{name}' has different textual contents!")
-    else:
-        print("✅ No files with the same name and different text.")
-
-# Run it
-find_duplicates_by_text("/tmp/pdfs/")
+# Run it on the folder containing your 609 PDFs
+find_duplicates_by_bytes("/path/to/your/pdf/folder")
