@@ -1,11 +1,15 @@
 import os
 import hashlib
-from pdfminer.high_level import extract_text
+import fitz  # PyMuPDF
 
 def calculate_text_hash(file_path):
     """Extract text from PDF and calculate a hash."""
     try:
-        text = extract_text(file_path)
+        doc = fitz.open(file_path)
+        text = ""
+        for page_num in range(doc.page_count):
+            page = doc.load_page(page_num)
+            text += page.get_text()
         text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()
         return text_hash
     except Exception as e:
@@ -28,7 +32,7 @@ def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
                     text_hash_to_files[text_hash] = []
                 text_hash_to_files[text_hash].append(file_name)
 
-                # Track if files with same name have different text
+                # Track if files with the same name have different text
                 if file_name not in name_to_text_hash:
                     name_to_text_hash[file_name] = []
                 name_to_text_hash[file_name].append(text_hash)
@@ -49,22 +53,7 @@ def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
         for name, hashes in same_name_diff_text.items():
             print(f"⚠ File name '{name}' has different textual contents!")
     else:
-        print("✅ No files with same name and different text.")
+        print("✅ No files with the same name and different text.")
 
 # Run it
 find_duplicates_by_text("/tmp/pdfs/")
-
-
-
-
-
----------------------------------------------------------------------------
-ModuleNotFoundError                       Traceback (most recent call last)
-Cell In[41], line 42
-     40 import os
-     41 import hashlib
----> 42 from pdfminer.high_level import extract_text
-     44 def calculate_text_hash(file_path):
-     45     """Extract text from PDF and calculate a hash."""
-
-ModuleNotFoundError: No module named 'pdfminer.high_level'
