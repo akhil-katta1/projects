@@ -5,15 +5,21 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 
+# Define a browser-like header
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/122.0.0.0 Safari/537.36"
+}
+
 # Function to download a single PDF and save directly into Lakehouse
 def download_single_pdf_to_lakehouse(pdf_url, lakehouse_folder, idx):
-    # Get the file name from the URL
     file_name = os.path.basename(pdf_url)
     file_path = os.path.join(lakehouse_folder, file_name)
 
     try:
-        # Fetch the PDF file
-        response = requests.get(pdf_url, timeout=10)
+        # Fetch the PDF file using browser headers
+        response = requests.get(pdf_url, headers=HEADERS, timeout=10)
         response.raise_for_status()
 
         # Save the PDF directly to Lakehouse
@@ -26,12 +32,11 @@ def download_single_pdf_to_lakehouse(pdf_url, lakehouse_folder, idx):
 
 # Main function to download multiple PDFs with threading
 def download_pdfs_to_lakehouse(url, lakehouse_folder="/lakehouse/default/Files/PDF_Downloads", max_workers=8):
-    # Ensure the Lakehouse folder exists
     os.makedirs(lakehouse_folder, exist_ok=True)
 
     try:
-        # Get the webpage content
-        response = requests.get(url)
+        # Get the webpage content using browser headers
+        response = requests.get(url, headers=HEADERS)
         response.raise_for_status()
     except Exception as e:
         print(f"Error fetching webpage: {e}")
@@ -43,18 +48,13 @@ def download_pdfs_to_lakehouse(url, lakehouse_folder="/lakehouse/default/Files/P
 
     print(f"Found {len(pdf_links)} PDF files. Starting downloads with {max_workers} threads...")
 
-    # Use ThreadPoolExecutor for fast downloading
+    # Download PDFs concurrently
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for idx, pdf_url in enumerate(pdf_links, start=1):
             executor.submit(download_single_pdf_to_lakehouse, pdf_url, lakehouse_folder, idx)
 
 # Main execution
 if _name_ == "_main_":
-    # Set the target webpage URL here
     target_url = "https://www.icai.org/post.html?post_id=17843"
-    
-    # Folder inside Lakehouse where PDFs will be saved
     lakehouse_target_folder = "/lakehouse/default/Files/PDF_Downloads"
-
-    # Start the download process
     download_pdfs_to_lakehouse(target_url, lakehouse_target_folder)
