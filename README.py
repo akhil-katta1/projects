@@ -65,3 +65,33 @@ def download_pdfs_to_lakehouse(url, lakehouse_folder="/lakehouse/default/Files/P
 # Main execution
 
 download_pdfs_to_lakehouse(target_url, lakehouse_target_folder)
+
+
+
+# Step 1: Download PDFs into /tmp/pdfs folder (local in Fabric Notebook)
+
+# Folder inside temporary notebook filesystem
+local_temp_folder = "/tmp/pdfs"
+
+os.makedirs(local_temp_folder, exist_ok=True)
+
+download_pdfs_to_lakehouse(target_url, local_temp_folder)
+
+
+
+# Step 2: Move the downloaded files to Lakehouse
+import shutil
+
+lakehouse_folder_path = f"Files/Market Data Files/State of Michigan/pdfs"
+
+# List files in /tmp/pdfs
+for file_name in os.listdir(local_temp_folder):
+    local_file_path = os.path.join(local_temp_folder, file_name)
+    
+    # Final destination inside Lakehouse
+    lakehouse_full_path = os.path.join(lakehouse_folder_path, file_name)
+    
+    # Save file to Lakehouse using Fabric built-in APIs
+    shutil.copy(local_file_path, f"/lakehouse/default/{lakehouse_full_path}")
+    
+    print(f"Uploaded {file_name} to Lakehouse: {lakehouse_full_path}")
