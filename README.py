@@ -1,51 +1,63 @@
+# Import necessary libraries
 import os
-import hashlib
-from PyPDF2 import PdfReader
+import requests
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 
-# Function to extract text from PDF and normalize it
-def extract_and_normalize_text(file_path):
-    """Extract text from PDF and normalize (remove extra spaces, line breaks)."""
+
+
+
+target_url = "https://mcsc.state.mi.us/MCSCJobSpecifications/JobSpecMain.aspx"
+    
+    # Folder inside Lakehouse where PDFs will be saved
+lakehouse_target_folder = f"{secret_1}@onelake.dfs.fabric.microsoft.com/{secret_2}/Files/Market Data Files/State of Michigan/pdfs"
+
+
+# Define a browser-like header
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/122.0.0.0 Safari/537.36"
+}
+
+# Function to download a single PDF and save directly into Lakehouse
+def download_single_pdf_to_lakehouse(pdf_url, lakehouse_folder, idx):
+    file_name = os.path.basename(pdf_url)
+    file_path = os.path.join(lakehouse_folder, file_name)
+
     try:
-        with open(file_path, 'rb') as file:
-            pdf = PdfReader(file)
-            text = ""
-            for page in pdf.pages:
-                text += page.extract_text()
+        # Fetch the PDF file using browser headers
+        response = requests.get(pdf_url, headers=HEADERS, timeout=10)
+        response.raise_for_status()
 
-        # Normalize text by removing extra spaces and line breaks
-        normalized_text = " ".join(text.split())
-        return normalized_text
+        # Save the PDF directly to Lakehouse
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+
+        print(f"{idx}. Downloaded to Lakehouse: {file_name}")
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
-        return None
+        print(f"{idx}. Failed to download {pdf_url}: {e}")
 
-# Function to compare and find duplicate PDFs based on text content
-def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
-    text_hash_to_files = {}
+# Main function to download multiple PDFs with threading
+def download_pdfs_to_lakehouse(url, lakehouse_folder="/lakehouse/default/Files/PDF_Downloads", max_workers=8):
+    os.makedirs(lakehouse_folder, exist_ok=True)
 
-    # Scan through all PDFs
-    for file_name in os.listdir(folder_path):
-        if file_name.endswith(".pdf"):
-            full_path = os.path.join(folder_path, file_name)
-            normalized_text = extract_and_normalize_text(full_path)
+    try:
+        # Get the webpage content using browser headers
+        response = requests.get(url, headers=HEADERS)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Error fetching webpage: {e}")
+        return
 
-            if normalized_text:
-                # Calculate a hash of the normalized text
-                text_hash = hashlib.sha256(normalized_text.encode('utf-8')).hexdigest()
+    # Parse the page to find all PDF links
+    soup = BeautifulSoup(response.text, "html.parser")
+    pdf_links = [urljoin(url, link['href']) for link in soup.find_all('a', href=lambda href: href and href.endswith('.pdf'))]
 
-                # Group files by normalized text hash
-                if text_hash not in text_hash_to_files:
-                    text_hash_to_files[text_hash] = []
-                text_hash_to_files[text_hash].append(file_name)
+    print(f"Found {len(pdf_links)} PDF files. Starting downloads with {max_workers} threads...")
 
-    # Find duplicates based on normalized text
-    print("🔎 Checking for duplicate PDFs by normalized text...\n")
-    duplicates = {h: f for h, f in text_hash_to_files.items() if len(f) > 1}
-    if duplicates:
-        for hash_val, files in duplicates.items():
-            print(f"✅ Duplicate text found in files: {files}")
-    else:
-        print("❌ No text-based duplicate PDFs found.")
-
-# Run it
-find_duplicates_by_text("/path/to/your/pdf/folder")
+    # Download PDFs concurrently
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for idx, pdf_url in enumerate(pdf_links, start=1):
+            executor.submit(download_single_pdf_to_lakehouse, pdf_url, lakehouse_folder, idx)
