@@ -1,35 +1,51 @@
 import os
+import hashlib
+from PyPDF2 import PdfReader
 
-def compare_files(file1, file2):
-    """Compare two PDF files byte by byte."""
+# Function to extract text from PDF and normalize it
+def extract_and_normalize_text(file_path):
+    """Extract text from PDF and normalize (remove extra spaces, line breaks)."""
     try:
-        with open(file1, 'rb') as f1, open(file2, 'rb') as f2:
-            file1_bytes = f1.read()
-            file2_bytes = f2.read()
-            return file1_bytes == file2_bytes  # Return True if identical, False otherwise
+        with open(file_path, 'rb') as file:
+            pdf = PdfReader(file)
+            text = ""
+            for page in pdf.pages:
+                text += page.extract_text()
+
+        # Normalize text by removing extra spaces and line breaks
+        normalized_text = " ".join(text.split())
+        return normalized_text
     except Exception as e:
-        print(f"Error comparing {file1} and {file2}: {e}")
-        return False
+        print(f"Error reading {file_path}: {e}")
+        return None
 
-def find_duplicates_by_bytes(folder_path="/tmp/pdfs/"):
-    files = [f for f in os.listdir(folder_path) if f.endswith(".pdf")]
-    duplicates = []
+# Function to compare and find duplicate PDFs based on text content
+def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
+    text_hash_to_files = {}
 
-    # Compare each pair of files
-    for i in range(len(files)):
-        for j in range(i + 1, len(files)):
-            file1 = os.path.join(folder_path, files[i])
-            file2 = os.path.join(folder_path, files[j])
-            if compare_files(file1, file2):
-                # If the files are identical, store them as duplicates
-                duplicates.append((files[i], files[j]))
+    # Scan through all PDFs
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith(".pdf"):
+            full_path = os.path.join(folder_path, file_name)
+            normalized_text = extract_and_normalize_text(full_path)
 
+            if normalized_text:
+                # Calculate a hash of the normalized text
+                text_hash = hashlib.sha256(normalized_text.encode('utf-8')).hexdigest()
+
+                # Group files by normalized text hash
+                if text_hash not in text_hash_to_files:
+                    text_hash_to_files[text_hash] = []
+                text_hash_to_files[text_hash].append(file_name)
+
+    # Find duplicates based on normalized text
+    print("🔎 Checking for duplicate PDFs by normalized text...\n")
+    duplicates = {h: f for h, f in text_hash_to_files.items() if len(f) > 1}
     if duplicates:
-        print("✅ Duplicate files found:")
-        for duplicate in duplicates:
-            print(f"Duplicate pair: {duplicate[0]} and {duplicate[1]}")
+        for hash_val, files in duplicates.items():
+            print(f"✅ Duplicate text found in files: {files}")
     else:
-        print("❌ No duplicate PDFs found.")
+        print("❌ No text-based duplicate PDFs found.")
 
-# Run it on the folder containing your 609 PDFs
-find_duplicates_by_bytes("/path/to/your/pdf/folder")
+# Run it
+find_duplicates_by_text("/path/to/your/pdf/folder")
