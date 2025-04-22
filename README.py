@@ -1,38 +1,55 @@
 import os
 import hashlib
+from pdfminer.high_level import extract_text
 
-def calculate_file_hash(file_path):
-    """Calculate SHA256 hash of the file."""
-    sha256 = hashlib.sha256()
-    with open(file_path, 'rb') as f:
-        while chunk := f.read(8192):  # read in chunks
-            sha256.update(chunk)
-    return sha256.hexdigest()
+def calculate_text_hash(file_path):
+    """Extract text from PDF and calculate a hash."""
+    try:
+        text = extract_text(file_path)
+        text_hash = hashlib.sha256(text.encode('utf-8')).hexdigest()
+        return text_hash
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return None
 
-def find_duplicate_pdfs(folder_path="/tmp/pdfs/"):
-    # Dictionary to hold hash → list of files
-    hash_dict = {}
+def find_duplicates_by_text(folder_path="/tmp/pdfs/"):
+    text_hash_to_files = {}
+    name_to_text_hash = {}
 
-    # Loop through all PDFs in the folder
+    # Scan through all PDFs
     for file_name in os.listdir(folder_path):
         if file_name.endswith(".pdf"):
             full_path = os.path.join(folder_path, file_name)
-            file_hash = calculate_file_hash(full_path)
+            text_hash = calculate_text_hash(full_path)
 
-            if file_hash in hash_dict:
-                hash_dict[file_hash].append(file_name)
-            else:
-                hash_dict[file_hash] = [file_name]
+            if text_hash:
+                # Group files by extracted text hash
+                if text_hash not in text_hash_to_files:
+                    text_hash_to_files[text_hash] = []
+                text_hash_to_files[text_hash].append(file_name)
 
-    # Find duplicates
-    duplicates = {hash_val: files for hash_val, files in hash_dict.items() if len(files) > 1}
+                # Track if files with same name have different text
+                if file_name not in name_to_text_hash:
+                    name_to_text_hash[file_name] = []
+                name_to_text_hash[file_name].append(text_hash)
 
+    # Find duplicates based on text
+    print("🔎 Checking for duplicate PDFs by extracted text...\n")
+    duplicates = {h: f for h, f in text_hash_to_files.items() if len(f) > 1}
     if duplicates:
-        print("Duplicate PDFs found:")
         for hash_val, files in duplicates.items():
-            print(f"Files with same content ({len(files)} copies): {files}")
+            print(f"✅ Duplicate text found in files: {files}")
     else:
-        print("No duplicate PDFs found!")
+        print("❌ No text-based duplicate PDFs found.")
 
-# Run the function
-find_duplicate_pdfs("/tmp/pdfs/")
+    # Find same-name but different text
+    print("\n🔎 Checking for files with same name but different text...\n")
+    same_name_diff_text = {n: h for n, h in name_to_text_hash.items() if len(set(h)) > 1}
+    if same_name_diff_text:
+        for name, hashes in same_name_diff_text.items():
+            print(f"⚠ File name '{name}' has different textual contents!")
+    else:
+        print("✅ No files with same name and different text.")
+
+# Run it
+find_duplicates_by_text("/tmp/pdfs/")
