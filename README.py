@@ -1,88 +1,62 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[4]:
-
+# Install required libraries in Fabric Notebook first (only once)
+# Fabric usually has requests and bs4 preinstalled
+# If not, you can use:
+# %pip install requests beautifulsoup4
 
 import os
+import requests
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 
-def extract_url_pdf(input_url,folder_path=os.getcwd()):
-    
-    import os
-    import requests
-    from urllib.parse import urljoin
-    from bs4 import BeautifulSoup
-    import pandas as pd
-    import datetime
-    
-    url = input_url
+# Fabric specific: Mount Lakehouse Files path
+lakehouse_files_path = "/lakehouse/default/Files/pdfs/"  # Save PDFs inside this path
 
-    #If there is no such folder, the script will create one automatically
-    folder_location = folder_path
-    if not os.path.exists(folder_location):os.mkdir(folder_location)
+# Create directory if not exists
+dbutils.fs.mkdirs(lakehouse_files_path)  # dbutils is available in Fabric notebooks
 
-    response = requests.get(url)
-    soup= BeautifulSoup(response.text, "html.parser") 
+# Function to download and save a single PDF into Lakehouse
+def download_single_pdf_to_lakehouse(pdf_url, idx):
+    file_name = os.path.basename(pdf_url)
+    lakehouse_full_path = lakehouse_files_path + file_name
 
-    link_text=list()
-    link_href=list()
-    link_file=list()
-    
-    counter=0
+    try:
+        # Download the PDF
+        response = requests.get(pdf_url, timeout=10)
+        response.raise_for_status()
 
-    for link in soup.select("a[href$='.pdf']"):
-        #Name the pdf files using the last portion of each link which are unique in this case
+        # Upload directly into Lakehouse Files
+        with open(f"/tmp/{file_name}", "wb") as f:
+            f.write(response.content)
         
-        filename = os.path.join(folder_location,link['href'].split('/')[-1])
-        with open(filename, 'wb') as f:
-            f.write(requests.get(urljoin(url,link['href'])).content)
-            
-        link_text.append(str(link.text))
-        
-        link_href.append(link['href'])
+        dbutils.fs.cp(f"file:/tmp/{file_name}", f"abfss:{lakehouse_full_path}")
 
-        link_file.append(link['href'].split('/')[-1])
-        
-        counter+=1
+        print(f"{idx}. Uploaded: {file_name}")
+    except Exception as e:
+        print(f"{idx}. Failed to download {pdf_url}: {e}")
 
-        print(counter, "-Files Extracted from URL named ",link['href'].split('/')[-1])
-        
-    table_dict={"Text":link_text,"Url_Link":link_href,"File Name":link_file}
+# Main function to parse the webpage and download multiple PDFs
+def download_pdfs_from_webpage_to_lakehouse(url, max_workers=8):
+    try:
+        # Fetch the webpage
+        response = requests.get(url)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Error fetching webpage: {e}")
+        return
 
-    df=pd.DataFrame(table_dict)
-    
-    time_stamp = datetime.datetime.now().strftime('%Y-%m-%d %H-%M-%S')
-    
-    print("Creating an Excel file with Name of FIle, Url Link and Link Text...")
-    
+    # Parse HTML to find PDF links
+    soup = BeautifulSoup(response.text, "html.parser")
+    pdf_links = [urljoin(url, link['href']) for link in soup.find_all('a', href=lambda href: href and href.endswith('.pdf'))]
 
-    new_excel_file=os.path.join(folder_location,"Excel_Output_"+time_stamp+".xlsx")
+    print(f"Found {len(pdf_links)} PDFs. Downloading with {max_workers} threads...")
 
-    writer = pd.ExcelWriter(new_excel_file, engine='openpyxl')
+    # Use multithreading for faster downloads
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        for idx, pdf_url in enumerate(pdf_links, start=1):
+            executor.submit(download_single_pdf_to_lakehouse, pdf_url, idx)
 
-    df.to_excel(writer,sheet_name="Output")
-
-    
-    writer.save()
-
-
-    print("All Pdf files downloaded and Excel File Created")
-
-
-# In[2]:
-
-
-
-#urls to try:
-
-# https://www.icai.org/category/bos-important-announcements
-# https://www.icai.org/post.html?post_id=17843
-#https://www.icai.org/post.html?post_id=17825
-# https://cbic-gst.gov.in/central-tax-notifications.html
-# https://trends.builtwith.com/websitelist/Responsive-Tables
-
-
-# In[5]:
-
-
-extract_url_pdf(input_url="https://www.icai.
+# MAIN execution
+if _name_ == "_main_":
+    target_url = "https://www.icai.org/post.html?post_id=17843"  # Change this URL if needed
+    download_pdfs_from_webpage_to_lakehouse(target_url, max_workers=8)
